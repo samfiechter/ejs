@@ -1,2 +1,2 @@
-# ejs
-Emacs javascript interpreter
+# emacs-js
+Emacs lisp javascript interpreter

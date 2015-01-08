@@ -1,0 +1,2 @@
+# ejs
+Emacs javascript interpreter

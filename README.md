@@ -1,2 +1,3 @@
-# emacs-js
-Emacs lisp javascript interpreter
+# emacs-js  
+Emacs lisp JavaScript interpreter (translator?) 
+ 

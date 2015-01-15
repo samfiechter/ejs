@@ -1,5 +1,5 @@
 ;;; emacs-js.el --- Emacs Javascript Interpreter
-;; Copyright (C) 2015 -- Use at 'yer own risk  -- NO WARRANTY! 
+;; Copyright (C) 2015 -- Use at 'yer own risk  -- NO WARRANTY!
 ;; Author: sam fiechter sam.fiechter(at)gmail
 ;; Version: 0.01
 ;; Created: 2015-01-07
@@ -12,46 +12,93 @@
 ;; ;;;;;;;;;;;;; variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar emacs-js-expr (cons  '( (list
-				 emacs-js-array
-				 emacs-js-obj
-				 emacs-js-name
-				 emacs-js-numeric
-				 ;;			       emacs-js-string
-				 ;;			       emacs-js-prototype
-				 ;;			       emacs-js-math
-				 ;;			       emacs-js-function
-				 ))
-			     (lambda (l) l)))
-
-(defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1)))) 
+                                 emacs-js-array
+                                 emacs-js-obj
+                                 emacs-js-name
+                                 emacs-js-numeric
+                                 ;;                            emacs-js-string
+                                 ;;                            emacs-js-prototype
+                                 ;;                            emacs-js-math
+                                 ;;                            emacs-js-function
+                                 ))
+                             (lambda (l) l)))
+(defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1))))
 (defvar emacs-js-array (cons '( "\[" ( emacs-js-expr (list "\]" emacs-js-array-more )))
-			     (lambda (l) (let ((i 0) (n (- (length l) 1)) (a (array))) (while (i < n ) (apush a (elt l i)) (setq i (+ 2 i))) a))))
-
+                             (lambda (l) (let ((i 0) (n (- (length l) 1)) (a (array))) (while (i < n ) (apush a (elt l i)) (setq i (+ 2 i))) a))))
 (defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
-				(lambda (l) (list (elt l 0) (elt l 2)))))
+                                (lambda (l) (list (elt l 0) (elt l 2)))))
 (defvar emacs-js-obj-more  (cons '( "," emacs-js-obj-expr) (lambda (l) (list (elt l 1)))))
-
 (defvar emacs-js-obj (cons '( "\{" ( emacs-js-obj-expr  (list "\}" emacs-js-obj-more)))
-							"," emacs-js-obj-expr)) "}")
-			   (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (makehash))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
+                           (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (makehash))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
 (defvar emacs-js-numeric (cons "\\([-+]?[:space:]*[0-9]+\\(\.[0-9]+\\)?\\([eE][+-]?[0-9]+\\)\\|0x[:xdigit:]+\\)?"
-			       (lambda (l) (string-to-number (l)))))
+                               (lambda (l) (string-to-number (l)))))
+(defvar emacs-js-name (cons "[a-zA-Z\$_][^\s]*" (lambda (l) l)))
+(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";") (lambda (l) (defvar (elt l 1) (elt l 3)))))
 
-(defvar emacs-js-name (cons "[a-zA-Z\$_][^\s]*") (lambda (l) l))
-(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";") (lambda (l) (defvar (elt l 1) (elt l 3))))) 
+(defun emacs-js-test (jstext var)
+  (let* ((s "")
+         (regexes (car var))
+         (testFunc (cdr var))
+         (m (list))
+         (lm 0)
+         (n 0)
+         (a (array))
+         (j 0)
+         (i 0)
+         )
+    (while (and (n < (length regexes)) lm)
+      ;;(elt regexes i) can be:
+      ;;        a string -- simple test
+      ;;        a symbol -- recusive other test
+      ;;        a list -- or any option
+      (setq s (replace-regexp-in-string "^[:space:]+" "" jstext )) ;; kill starting whitspace
+      (setq s (replace-regexp-in-string "\/\/.*?\n" "" jstext )) ;; kill comments
+      (setq s (replace-regexp-in-string "\/\*.*?\*\/" "" jstext )) ;; kill comments
+      (if (stringp (elt regexes i))
+          (progn
+            (setq lm  (string-match (elt regexes i) s))
+            (if (= 0 lm)
+                (progn
+                  (setq j (match-string 1 s))
+                  (aset a i j)
+                  (setq s (substring s (length j)))
+                  )
+              (setq lm nil)))
+        (if (listp (elt regexes i))
+            (let ((k 0) (orlist (elt regexes i)))
+              (while (and (k < (length orlist) (not (= 0 lm))))
+                (setq lm  (string-match (elt regexes i) s))
+                (if (= 0 lm)  ;; match
+                    (progn
+                      (setq j (match-string 1 s))
+                      (aset a i j)
+                      (setq s (substring s (length j)))
+                      ) nil)
+                )
+              (setq lm (= 0 lm))
+              ))
+        (if (symbolp (elt regexes i))
+            (let ((symbol-test (emacs-js-test-eval s (symbol-value symbolp))))
+              (if (symbol-test)
+                  (progn
+                    (aset a i (car symbol-test))
+                    (setq s (cdr symbol-test))
+                    ) (setq lm nil)) )
+          (message "ERROR : DEF NOT SYMBOL, LIST, OR STRING"))) )
+    (inc i)
+    (cons (funcall testfunc a) s) ;; return the element and string
+    ))
 
-(defun emacs-js-testp (jstext var)
-
-  )
 
 (defun emacs-js-eval (jstext) "evaluate javascript text"
-    (let* (
-	   
-	   )
-      )
-  )
+       (let* (
+
+              )
+         )
+       )
 (defmacro apush (arr var)
   (aset arr (length arr) var))
+
 (defmacro inc (var)
   (list 'setq var (list '1+ var)))
 
@@ -62,47 +109,45 @@
 
 (defun emacs-js-tokenize (jstext) "Convert arg to a list of tokens"
        (let* (
-	      (toksep (strsort (concat emacs-js-whitespace emacs-js-operators "()[]{}")))
-	      (ccstart 0)
-	      (cend 0)
-	      (tokens (list))
-	      (len (length jstext))
-	      )
-	 (while (and (< ccstart len) (<=cend len))
-	   (skip-chars-listed cstart jstext len emacs-js-whitespace)  ;; skip whitespace
-	   (setq cend cstart)
-	   (skip-chars-not-listed cend jstext len 
-	   
-	   )
-)))
+              (toksep (strsort (concat emacs-js-whitespace emacs-js-operators "()[]{}")))
+              (ccstart 0)
+              (cend 0)
+              (tokens (list))
+              (len (length jstext))
+              )
+         (while (and (< ccstart len) (<=cend len))
+           (skip-chars-listed cstart jstext len emacs-js-whitespace)  ;; skip whitespace
+           (setq cend cstart)
+           (skip-chars-not-listed cend jstext len
+
+                                  )
+           )))
 
 
 
 (defun char-in-sstr (c s)
   (let ((i 0)
-	(l (length s)))
+        (l (length s)))
     (while (and (< i l) (< (elt s i) c))
       (setq i (+ 1 i)) )
     (char-equal (elt s i) c)))
 
 (defun strsort (arr)
   (let ((out "")
-	(i 0)
-	(l (length arr)))    
+        (i 0)
+        (l (length arr)))
     (dotimes (i l)
       (let ((x (elt arr i))
-	    (j 0)
-	    (ol (length out)))
-	(while (and (< j ol) (< (elt out j) x ))
-	  (setq j (+ j 1)) )
-	
-	(setq out  (concat
-		    (substring out 0 j)
-		    (char-to-string x)
-		    (substring out j ol)
-		    ))
-	))
+            (j 0)
+            (ol (length out)))
+        (while (and (< j ol) (< (elt out j) x ))
+          (setq j (+ j 1)) )
+
+        (setq out  (concat
+                    (substring out 0 j)
+                    (char-to-string x)
+                    (substring out j ol)
+                    ))
+        ))
     out
     ))
-
-    

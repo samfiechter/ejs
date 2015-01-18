@@ -1,9 +1,14 @@
-;;; emacs-js.el --- Emacs Javascript Interpreter
+;;; emacs-js.el --- Emacs Javascript Interpreter (or prehap translator)
 ;; Copyright (C) 2015 -- Use at 'yer own risk  -- NO WARRANTY!
 ;; Author: sam fiechter sam.fiechter(at)gmail
 ;; Version: 0.01
 ;; Created: 2015-01-07
 ;; Keywords: javascript
+
+;; So this is an attempt to translate JS to emacs lisp...
+;; possible uses are in eww type browsers, or for doing config for people that don't want to learn emacs's lisp
+;;
+
 
 ;; js language charts
 ;;// http://cdn.oreilly.com/excerpts/9780596517748/web/jsgp_ad21.png
@@ -21,7 +26,13 @@
                                  ;;                            emacs-js-math
                                  ;;                            emacs-js-function
                                  ))
-                             (lambda (l) l)))
+                             (lambda (l) l))) ;; pass through
+
+(defvar emacs-js-operator-more (cons '( (list emacs-js-operator-calc emacs-js-expr)) (lambda)))
+
+(defvar emacs-js-operator-calc (cons '( emacs-js-expr (list "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) ))
+(defvar emacs-js-operator (cons '( emacs-js-operator-calc) (lambda () ()))
+								       
 (defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1))))
 (defvar emacs-js-array (cons '( "\[" ( emacs-js-expr (list "\]" emacs-js-array-more )))
                              (lambda (l) (let ((i 0) (n (- (length l) 1)) (a (array))) (while (i < n ) (apush a (elt l i)) (setq i (+ 2 i))) a))))
@@ -32,8 +43,31 @@
                            (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (makehash))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
 (defvar emacs-js-numeric (cons "\\([-+]?[:space:]*[0-9]+\\(\.[0-9]+\\)?\\([eE][+-]?[0-9]+\\)\\|0x[:xdigit:]+\\)?"
                                (lambda (l) (string-to-number (l)))))
+(defvar emacs-js-name-more (cons '( "," emacs-js-name) (lambda (l) (elt l 1)))
 (defvar emacs-js-name (cons "[a-zA-Z\$_][^\s]*" (lambda (l) l)))
-(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";") (lambda (l) (defvar (elt l 1) (elt l 3)))))
+
+(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";")
+			      (lambda (l) (let ((h (elt emacs-js-symbols emacs-js-stack-level)))
+											  (if (hashp h) (puthash (elt l 1) (elt l 3) h)
+											    (progn
+											      (setq h (makehash))
+											      (puthash (elt l 1) (elt l 3) h)
+k											      (aset  emacs-js-symbols emacs-js-stack-level h)
+											      ))))))
+(defvar emacs-js-function (cons '( "function" emacs-js-name "(" emacs-js-name (list ")" emacs-js-name-more) "{" emacs-js-statements "}")
+				(lambda (l) )))
+				
+
+(defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
+
+(defvar emacs-js-statements (cons '( (list
+                                      emacs-js-defvar
+                                      ))
+                                  (lambda (l) l )))
+
+(defvar emacs-js-stack-level 0)
+(defvar emacs-js-symbols (list ))
+(defvar emacs-js-exec (list )) 
 
 (defun emacs-js-test (jstext var)
   (let* ((s "")
@@ -104,6 +138,7 @@
 
 (defmacro skip-chars-listed (idx txt len skipchars)
   (list 'while (list 'and (list '< idx len) (list 'char-in-sstr (list 'elt txt idx) skipchars)) (list 'inc idx)) )
+
 (defmacro skip-chars-not-listed (idx txt len skipchars)
   (list 'while (list 'and (list '< idx len) (list 'not (list 'char-in-sstr (list 'elt txt idx) skipchars))) (list 'inc idx)) )
 

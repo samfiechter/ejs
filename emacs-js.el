@@ -28,10 +28,22 @@
                                  ))
                              (lambda (l) l))) ;; pass through
 
-(defvar emacs-js-operator-more (cons '( (list emacs-js-operator-calc emacs-js-expr)) (lambda)))
+(defvar emacs-js-operator-more (cons '( (list emacs-js-operator-calc emacs-js-expr)) (lambda (l) l)))
 
-(defvar emacs-js-operator-calc (cons '( emacs-js-expr (list "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) ))
-(defvar emacs-js-operator (cons '( emacs-js-operator-calc) (lambda () ()))
+(defvar emacs-js-operator-calc (cons '( emacs-js-expr (list "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
+(defvar emacs-js-operator (cons '( emacs-js-operator-calc)
+				(lambda (l)
+				  ;; l should be of format expr op expr op expr...
+				  (let ((op-order (cons "*" (quote *))
+						  (cons "/" (quote /))
+						  (cons "+" (quote +))
+						  (cons "-" (quote -))
+						  (cons "|" '( logior))
+						  
+						  ))
+				    (dolist (i op-order)
+				      
+				    ))) ))
 								       
 (defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1))))
 (defvar emacs-js-array (cons '( "\[" ( emacs-js-expr (list "\]" emacs-js-array-more )))

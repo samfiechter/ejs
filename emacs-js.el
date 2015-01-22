@@ -28,26 +28,28 @@
                                  ))
                              (lambda (l) l))) ;; pass through
 
+(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)" (lambda (l)(let* ((s (elt l 0))(ll (length s)) )(substring s 1 (- ll 2)))))))
 (defvar emacs-js-operator-more (cons '( (list emacs-js-operator-calc emacs-js-expr)) (lambda (l) l)))
-
-(defvar emacs-js-operator-calc (cons '( emacs-js-expr (list "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
+(defvar emacs-js-operator-calc (cons '( emacs-js-expr (list "+" "-" "/" "*" "|q|" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))  ;; collect the whole operation
 (defvar emacs-js-operator (cons '( emacs-js-operator-calc)
-				(lambda (l)
-				  ;; l should be of format expr op expr op expr...
-				  (let ((op-order (cons "*" (quote *))
-						  (cons "/" (quote /))
-						  (cons "+" (quote +))
-						  (cons "-" (quote -))
-						  (cons "|" '( logior))
-						  
-						  ))
-				    (dolist (i op-order)
-				      
-				    ))) ))
-								       
+                                (lambda (l)
+                                  ;; l should be of format expr op expr op expr...
+                                  (let ((op-order (cons "*" '*)
+                                                  (cons "/" '/)
+                                                  (cons "+" '+)
+                                                  (cons "-" '-)
+                                                  (cons "|" 'logior)
+                                                  (cons "&" 'logand)
+                                                  (cons "||" 'or)
+                                                  (cons "&&" 'and)
+                                                  ))
+                                    (dolist (i op-order)
+
+                                      ))) ))
+
 (defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1))))
-(defvar emacs-js-array (cons '( "\[" ( emacs-js-expr (list "\]" emacs-js-array-more )))
-                             (lambda (l) (let ((i 0) (n (- (length l) 1)) (a (array))) (while (i < n ) (apush a (elt l i)) (setq i (+ 2 i))) a))))
+(defvar emacs-js-array (cons '( "\[" ( emacs-js-expr (list "\]" ema-js-array-more )))
+                             (lambda (l) (let ((i 0) (n (- (length l) 1)) (a [])) (while (i < n ) (vconcat a (elt l i)) (setq i (+ 2 i))) a))))
 (defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
                                 (lambda (l) (list (elt l 0) (elt l 2)))))
 (defvar emacs-js-obj-more  (cons '( "," emacs-js-obj-expr) (lambda (l) (list (elt l 1)))))
@@ -55,20 +57,23 @@
                            (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (makehash))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
 (defvar emacs-js-numeric (cons "\\([-+]?[:space:]*[0-9]+\\(\.[0-9]+\\)?\\([eE][+-]?[0-9]+\\)\\|0x[:xdigit:]+\\)?"
                                (lambda (l) (string-to-number (l)))))
-(defvar emacs-js-name-more (cons '( "," emacs-js-name) (lambda (l) (elt l 1)))
+(defvar emacs-js-name-more (cons '( "," emacs-js-name) (lambda (l) (elt l 1))))
 (defvar emacs-js-name (cons "[a-zA-Z\$_][^\s]*" (lambda (l) l)))
 
 (defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";")
-			      (lambda (l) (let ((h (elt emacs-js-symbols emacs-js-stack-level)))
-											  (if (hashp h) (puthash (elt l 1) (elt l 3) h)
-											    (progn
-											      (setq h (makehash))
-											      (puthash (elt l 1) (elt l 3) h)
-k											      (aset  emacs-js-symbols emacs-js-stack-level h)
-											      ))))))
+                              (lambda (l)
+                                (let ((h (elt emacs-js-symbols 0)))
+                                  (if (and (hashp h) (> 0 (length emacs-js-symbols)))
+                                      (puthash (elt l 1) (elt l 3) h)
+                                    (progn
+                                      (setq h (makehash))
+                                      (puthash (elt l 1) (elt l 3) h)
+                                      (push h  emacs-js-symbols)
+                                      ))))))
+
 (defvar emacs-js-function (cons '( "function" emacs-js-name "(" emacs-js-name (list ")" emacs-js-name-more) "{" emacs-js-statements "}")
-				(lambda (l) )))
-				
+                                (lambda (l) )))
+
 
 (defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
 
@@ -77,76 +82,97 @@ k											      (aset  emacs-js-symbols emacs-js-stack-level h)
                                       ))
                                   (lambda (l) l )))
 
-(defvar emacs-js-stack-level 0)
+(defvar emacs-js-prototypes (list ))
 (defvar emacs-js-symbols (list ))
-(defvar emacs-js-exec (list )) 
+(defvar emacs-js-bytecode (list ))
+
 
 (defun emacs-js-test (jstext var)
-  (let* ((s "")
-         (regexes (car var))
-         (testFunc (cdr var))
-         (m (list))
-         (lm 0)
+  (let* ((s jstext)                                     ;
+         (test-patterns (car var))                      ;test pattern
+         (testFunc (cdr var))                           ;function to translate tokens into bc
+         (strlens (list))                               ;lengths for each token (for error report)
+         (tokens (list))                                ;lists of tokens
+         (lm 0)                                         ;lost match?
          (n 0)
-         (a (array))
          (j 0)
          (i 0)
          )
-    (while (and (n < (length regexes)) lm)
-      ;;(elt regexes i) can be:
+    (while (and (n < (length test-patterns)) lm)
+
+      ;;(elt test-patterns i) can be:
       ;;        a string -- simple test
       ;;        a symbol -- recusive other test
       ;;        a list -- or any option
-      (setq s (replace-regexp-in-string "^[:space:]+" "" jstext )) ;; kill starting whitspace
-      (setq s (replace-regexp-in-string "\/\/.*?\n" "" jstext )) ;; kill comments
-      (setq s (replace-regexp-in-string "\/\*.*?\*\/" "" jstext )) ;; kill comments
-      (if (stringp (elt regexes i))
+
+      (setq s (replace-regexp-in-string "^[:space:]+" "" jstext ))                                 ;; kill starting whitspace
+      (setq s (replace-regexp-in-string "\/\/.*?\n" "" jstext ))  ; kill comments
+      (setq s (replace-regexp-in-string "\/\*.*?\*\/" "" jstext )) ; kill comments
+      (if (stringp (elt test-patterns i))
           (progn
-            (setq lm  (string-match (elt regexes i) s))
+            (setq lm  (string-match (elt test-patterns i) s))
             (if (= 0 lm)
-                (progn
-                  (setq j (match-string 1 s))
-                  (aset a i j)
-                  (setq s (substring s (length j)))
+                (let ((token (match-string 1 s)))
+                  (nconc tokens token) ;; add token to end of list
+                  (setq s (substring s (length token)))
+                  (nconc strlens (length s))
                   )
-              (setq lm nil)))
-        (if (listp (elt regexes i))
-            (let ((k 0) (orlist (elt regexes i)))
+              (setq lm nil))) ;; if the first character is not a match, barf
+        (if (listp (elt test-patterns i))  ;; list is an OR-list
+            (let ((k 0)
+                  (orlist (elt test-patterns i)))
               (while (and (k < (length orlist) (not (= 0 lm))))
-                (setq lm  (string-match (elt regexes i) s))
-                (if (= 0 lm)  ;; match
-                    (progn
-                      (setq j (match-string 1 s))
-                      (aset a i j)
-                      (setq s (substring s (length j)))
-                      ) nil)
-                )
+                (if (symbolp (elt orlist k))  ;; list can be symbol or string (two ors are one or)
+                    (let ((symbol-test (emacs-js-test-eval s (symbol-value (elt orlist k)))))
+                      (if (symbol-test)
+                          (progn
+                            (nconc tokens (car symbol-test))
+                            (setq s (cdr symbol-test))
+                            (nconc strlens (length s))
+                            (setq lm 0)
+                            ) (setq lm nil)))
+                  (progn ;; string if not symbol
+                    (setq lm  (string-match (elt orlist k) s))
+                    (if (= 0 lm)  ;; match
+                        (progn
+                          (let ((token (match-string 1 s)))
+                            (nconc tokens token)
+                            (setq s (substring s (length token)))
+                            ) nil)
+                      ))
+                  ))
               (setq lm (= 0 lm))
-              ))
-        (if (symbolp (elt regexes i))
-            (let ((symbol-test (emacs-js-test-eval s (symbol-value symbolp))))
-              (if (symbol-test)
-                  (progn
-                    (aset a i (car symbol-test))
-                    (setq s (cdr symbol-test))
-                    ) (setq lm nil)) )
-          (message "ERROR : DEF NOT SYMBOL, LIST, OR STRING"))) )
-    (inc i)
-    (cons (funcall testfunc a) s) ;; return the element and string
-    ))
+              )
+          ;; If its not a list or a string its a symbol
+          (if (symbolp (elt test-patterns i))
+              (let ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i)))))
+                (if (symbol-test)
+                    (progn
+                      (nconc tokens (car symbol-test))
+                      (setq s (cdr symbol-test))
+                      (nconc strlens (length s))
+                      ) (setq lm nil)) )
+            (message "ERROR : DEF NOT SYMBOL, LIST, OR STRING"))) )
+      (inc i)
+      (cons (funcall testfunc a) s)                                             ;; return the element and string
+      )))
 
 
 (defun emacs-js-eval (jstext) "evaluate javascript text"
-       (let* (
-
+       (setq emacs-js-prototypes (list ))
+       (setq emacs-js-symbols (list ))
+       (setq emacs-js-bytecode (list ))
+       (let* ((txt-len (length jstext))
+              (s jstext)
               )
          )
        )
-(defmacro apush (arr var)
-  (aset arr (length arr) var))
+
+(defun elts (mylst start end)
+  (mapcar (lambda (x) (elt mylst x)) (number-sequence start end)) )
 
 (defmacro inc (var)
-  (list 'setq var (list '1+ var)))
+  (list 'setq var (list '1+ var)) )
 
 (defmacro skip-chars-listed (idx txt len skipchars)
   (list 'while (list 'and (list '< idx len) (list 'char-in-sstr (list 'elt txt idx) skipchars)) (list 'inc idx)) )

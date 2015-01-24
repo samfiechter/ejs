@@ -200,6 +200,8 @@
 (defmacro inc (var)
   (list 'setq var (list '1+ var)) )
 
+
+
 (defmacro skip-chars-listed (idx txt len skipchars)
   (list 'while (list 'and (list '< idx len) (list 'char-in-sstr (list 'elt txt idx) skipchars)) (list 'inc idx)) )
 
@@ -229,10 +231,12 @@ HASH is (sxhash  SYMBOL)
 	       (inc i))
 	     (if ret (cdr ret) nil) ;; sumbols are stored  (symbolname . value)
 	     ));; there should be a cant find it error in here somewhere...
-		 
+
+(defmacro fpdiv (a b) (list '/ (list '* 1.0 a) b))
+
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
   (let ((tok tokens)
-	(op-order (list (cons "*" '*) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
+	(op-order (list (cons "*" '*) (cons "/" 'fpdiv) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
 			(cons "||" 'or) (cons "&&" 'and) )) )
     (dolist (i op-order)
       (let ((j 1))

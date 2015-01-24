@@ -80,8 +80,9 @@
                                     (progn
                                       (setq h (make-hash-table))
                                       (puthash (elt l 1) (elt l 3) h)
-                                      (push h  emacs-js-symbols)
-                                      ))))))
+                                      (cons h  emacs-js-symbols)
+				      )))
+				(elt l 3))))  ;; return the expr
 
 (defvar emacs-js-function (cons '( "function" emacs-js-name "(" emacs-js-name ( ")" emacs-js-name-more) "{" emacs-js-statements "}")
                                 (lambda (l) )))

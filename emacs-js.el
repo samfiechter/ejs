@@ -41,6 +41,7 @@
 				 emacs-js-numeric
 				 emacs-js-string
 				 emacs-js-array
+				 emacs-js-parens
 				 emacs-js-obj
 				 emacs-js-name				 
                                  ;;                            emacs-js-prototype
@@ -58,13 +59,14 @@
 (defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(let* ((s (elt l 0))(ll (length s)) )(substring s 1 (- ll 2))))))
 (defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (elt l 1)))) ;; pass through expr (grouping any calc)
 (defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) l)))
-(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more)
+(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "\/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more)
 					(lambda (l) l)))
 (defvar emacs-js-operator (cons '( emacs-js-operator-collect) ;; collect the whole operation
 				(lambda (l) (emacs-js-operator-parse l))))
-(defvar emacs-js-array-more (cons '( "," emacs-js-expr) (lambda (l) (elt l 1))))
-(defvar emacs-js-array (cons '( "\\[" ( emacs-js-expr ( "\\]" emacs-js-array-more )))
-(lambda (l) (let ((i 0) (n (- (length l) 1)) (a [])) (while (i < n ) (vconcat a (elt l i)) (setq i (+ 2 i))) a))))
+(defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(l) l)))
+(defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) l)))
+(defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]"))
+(lambda (l) (let ((i 1) (n (- (length l) 1)) (a [])) (while (< i n ) (setq a (vconcat a (list (elt l i)))) (setq i (+ 2 i)) ) a))))
 
 (defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
                                 (lambda (l) (list (elt l 0) (elt l 2)))))

@@ -7,12 +7,11 @@
 
 ;; So this is an attempt to translate JS to emacs lisp...
 ;; possible uses are in eww type browsers, or for doing config for people that don't want to learn emacs's lisp
-;;
-
 
 ;; js language charts
 ;;// http://cdn.oreilly.com/excerpts/9780596517748/web/jsgp_ad21.png
 ;;http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf
+
 ;;;Code
 ;; ;;;;;;;;;;;;; variables ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -33,8 +32,6 @@
 ;;                                a list of available defs or strings (any of which will work)
 ;;
 
-
-
 (defvar emacs-js-single (cons  '( (
 				 emacs-js-null
 				 emacs-js-boolean
@@ -44,34 +41,35 @@
 				 emacs-js-parens
 				 emacs-js-obj
 				 emacs-js-name				 
-                                 ;;                            emacs-js-prototype
-                                 ;;                            emacs-js-function
+				 ;;  emacs-js-prototype
+                                 ;;  emacs-js-function
                                  ))
-                             (lambda (l) l)))
-(defvar emacs-js-expr (cons '( (
-				emacs-js-operator
-				emacs-js-single
-				))
-			    (lambda (l) l)))
-
-(defvar emacs-js-null (cons '( "null" ) (lambda(l) nil)))
-(defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt l 0)) (string-equal (elt l 0) "true")) t nil))))
-(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(let* ((s (elt l 0))(ll (length s)) )(substring s 1 (- ll 2))))))
-(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (elt l 1)))) ;; pass through expr (grouping any calc)
+			       (lambda (l) l)))
+(defvar emacs-js-expr (cons '( (emacs-js-operator emacs-js-single )) (lambda (l) l)))
 (defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) l)))
-(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "\/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more)
-					(lambda (l) l)))
-(defvar emacs-js-operator (cons '( emacs-js-operator-collect) ;; collect the whole operation
-				(lambda (l) (emacs-js-operator-parse l))))
+(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "\/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
+(defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
+
+(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-expr (list ")"  'emacs-js-fn-arg-more)) (lambda(l) l)))
+(defvar emacs-js-fn-arg-first (cons (list 'emacs-js-expr (list ")"  'emacs-js-fn-arg-more)) (lambda (l) l)))
+(defvar emacs-js-fn-stmt-more (cons '( emacs-js-statement ( emacs-js-fn-stmt-more "}")) (lambda (l) l)))
+(defvar emacs-js-function (cons '( "function" "(" ( emacs-js-fn-arg-first ")" ) "{" ("}" emacs-js-fn-stmt-more) ) (lambda (tok) tok )))
+
+(defvar emacs-js-null (cons '( "null" ) (lambda(l) '(nil))))
+(defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt l 0)) (string-equal (elt l 0) "true")) '( t ) '( nil )))))
+(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(let* ((s (elt l 0))(ll (length s)) )(list (substring s 1 (- ll 2)))))))
+(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (elt l 1)))) 
 (defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(l) l)))
 (defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) l)))
 (defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]"))
-(lambda (l) (let ((i 1) (n (- (length l) 1)) (a [])) (while (< i n ) (setq a (vconcat a (list (elt l i)))) (setq i (+ 2 i)) ) a))))
-
-(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
-                                (lambda (l) (list (elt l 0) (elt l 2)))))
+			     (lambda (l) (let ((i 1) (n (- (length l) 1)) (a []))
+					   (while (< i n )
+					     (setq a (vconcat a (list (elt l i)))) (setq i (+ 2 i)) )
+					   a))))
 
 (defvar emacs-js-obj-more  (cons '( "," emacs-js-obj-expr) (lambda (l) (list (elt l 1)))))
+(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
+                                (lambda (l) (list (elt l 0) (elt l 2)))))
 
 (defvar emacs-js-obj (cons '( "{" ( emacs-js-obj-expr  ( "}" emacs-js-obj-more)))
                            (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (make-hash-table))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
@@ -84,18 +82,23 @@
 (defvar emacs-js-name (cons (list "[a-zA-Z\$_][^\s]*" ) (lambda (l) (elt l 0))))
 (defvar emacs-js-symbol (cons (list "[a-zA-Z\$_][^\s]*" ) (lambda (l) (emacs-js-getvarf(sxhash(elt l 0))))))
 
-(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr ";")
+
+(defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr )
                               (lambda (l) (emacs-js-defvarf (sxhash (elt l 1)) (elt l 1) (elt l 3)))))
+
 
 (defvar emacs-js-function (cons '( "function" emacs-js-name "(" emacs-js-name ( ")" emacs-js-name-more) "{" emacs-js-statements "}")
                                 (lambda (l) )))
 
 (defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
 
-(defvar emacs-js-statements (cons '( (
+
+
+(defvar emacs-js-statement (cons '( (
                                       emacs-js-defvar
 				      emacs-js-expr
-                                      ))
+				      emacs-js-function
+                                      ) ";" )
                                   (lambda (l) l )))
 
 	;;  ____  _        _        __     __         _       _     _           	

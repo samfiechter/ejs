@@ -40,7 +40,7 @@
 				 emacs-js-array
 				 emacs-js-parens
 				 emacs-js-obj
-				 emacs-js-name				 
+				 emacs-js-symbol
 				 ;;  emacs-js-prototype
                                  ;;  emacs-js-function
                                  ))
@@ -50,49 +50,39 @@
 (defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "\/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
 (defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
 
-(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-expr (list ")"  'emacs-js-fn-arg-more)) (lambda(l) l)))
-(defvar emacs-js-fn-arg-first (cons (list 'emacs-js-expr (list ")"  'emacs-js-fn-arg-more)) (lambda (l) l)))
+(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(l) (cdr l)))) ;; cdr to skip comma
+(defvar emacs-js-fn-arg-first (cons (list 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda (l) l)))
 (defvar emacs-js-fn-stmt-more (cons '( emacs-js-statement ( emacs-js-fn-stmt-more "}")) (lambda (l) l)))
-(defvar emacs-js-function (cons '( "function" "(" ( emacs-js-fn-arg-first ")" ) "{" ("}" emacs-js-fn-stmt-more) ) (lambda (tok) tok )))
+(defvar emacs-js-defun (cons (list "function" "(" (list 'emacs-js-fn-arg-first ")" ) "{" (list "}" 'emacs-js-fn-stmt-more )) ( lambda (l) (emacs-js-defunf l))))
 
 (defvar emacs-js-null (cons '( "null" ) (lambda(l) '(nil))))
 (defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt l 0)) (string-equal (elt l 0) "true")) '( t ) '( nil )))))
-(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(let* ((s (elt l 0))(ll (length s)) )(list (substring s 1 (- ll 2)))))))
+(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(list (substring (elt l 0) 1 -1)))))
 (defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (elt l 1)))) 
-(defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(l) l)))
+
+;; array
+(defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(tk) (cdr tk))))
 (defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) l)))
-(defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]"))
-			     (lambda (l) (let ((i 1) (n (- (length l) 1)) (a []))
-					   (while (< i n )
-					     (setq a (vconcat a (list (elt l i)))) (setq i (+ 2 i)) )
-					   a))))
+(defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]")) (lambda (l) (emacs-js-make-array l))))
 
-(defvar emacs-js-obj-more  (cons '( "," emacs-js-obj-expr) (lambda (l) (list (elt l 1)))))
-(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr)
-                                (lambda (l) (list (elt l 0) (elt l 2)))))
+;; Object			     
+(defvar emacs-js-obj-more  (cons (list "," 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more))  (lambda (l) (cdr l)))) 
+(defvar emacs-js-obj-first  (cons (list 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more ) ) (lambda (l) l)))
+(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr) (lambda (l) (list (elt l 0) (elt l 2)))))
 
-(defvar emacs-js-obj (cons '( "{" ( emacs-js-obj-expr  ( "}" emacs-js-obj-more)))
-                           (lambda (l) (let ((i 0) (n (- (length l) 1)) (h (make-hash-table))) (while (i < n) (puthash (elt l i) (elt l (+ 1 i)) h) (setq i (+ 2 i))) h))))
-
+(defvar emacs-js-obj (cons (list "{" (list 'emacs-js-obj-first   "}" ) ) (lambda (l) (emacs-js-make-obj l))))
+                           
 (defvar emacs-js-numeric (cons '( "[+-]?[0-9]+\\(\\.[0-9]+\\)?" )
                                (lambda (l) (string-to-number (elt l 0)))))
-
-(defvar emacs-js-name-more (cons '( "," emacs-js-name) (lambda (l) (elt l 1))))
-
-(defvar emacs-js-name (cons (list "[a-zA-Z\$_][^\s]*" ) (lambda (l) (elt l 0))))
-(defvar emacs-js-symbol (cons (list "[a-zA-Z\$_][^\s]*" ) (lambda (l) (emacs-js-getvarf(sxhash(elt l 0))))))
+(defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:]*")
+(defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) l)))
+(defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (tk) (list (list 'emacs-js-getvarf (list 'sxhash (elt tk 0)))))))  ;; double list commands
 
 
 (defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr )
                               (lambda (l) (emacs-js-defvarf (sxhash (elt l 1)) (elt l 1) (elt l 3)))))
 
-
-(defvar emacs-js-function (cons '( "function" emacs-js-name "(" emacs-js-name ( ")" emacs-js-name-more) "{" emacs-js-statements "}")
-                                (lambda (l) )))
-
 (defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
-
-
 
 (defvar emacs-js-statement (cons '( (
                                       emacs-js-defvar
@@ -218,7 +208,13 @@
 (defmacro skip-chars-not-listed (idx txt len skipchars)
   (list 'while (list 'and (list '< idx len) (list 'not (list 'char-in-sstr (list 'elt txt idx) skipchars))) (list 'inc idx)) )
 
-
+(defun emacs-js-defunf (toks) ;; function is defined as 
+  (let ((i 1)
+	(j (- (length toks) 2)))
+    (while (not (string= ")" (elt toks i))) (inc i))
+    (cons (elts 1 (- i 1)) (list (if (> j i) (elts (+ 1 i) j) (list))))
+    ))
+  
 (defun emacs-js-defvarf (a b c) " emacs-js-defvar HASH SYMBOL VALUE declare a varialbe in the top stack level. 
 
 HASH is (sxhash SYMBOL) -- done at parse time to speed execution
@@ -242,22 +238,45 @@ HASH is (sxhash  SYMBOL)
 	     (if ret (cdr ret) nil) ;; sumbols are stored  (symbolname . value)
 	     ));; there should be a cant find it error in here somewhere...
 
+(defun emacs-js-make-obj (l)
+  (let ((i 1)
+	(n (- (length l) 2))
+	(h (make-hash-table)))
+    (while (< i  n)
+      (puthash (sxhash (elt l i)) (cons (elt l i) (elt l (+ 1 i))) h)
+      (setq i (+ 2 i)))
+    h))
+
+
+(defun emacs-js-make-array (l)
+  (let ((i 1)
+	(n (- (length l) 2))
+	(a []))
+    (if (> n i)
+	(setq a (vconcat (elts l 1 n))))
+    (list a)))
+
+
+
 (defmacro fpdiv (a b) (list '/ (list '* 1.0 a) b))
 
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
   (let ((tok tokens)
 	(op-order (list (cons "*" '*) (cons "/" 'fpdiv) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
 			(cons "||" 'or) (cons "&&" 'and) )) )
+    ;; 3 "+" 2 "*" 3 "-" 2 "+" 2
     (dolist (i op-order)
       (let ((j 1))
       (while (< j (length tok)) 
 	(if (and (stringp (elt tok j)) (string-equal (car i) (elt tok j)))
 	    (progn
-	    (setq tok (append (if (> j 2) (elts tok 0 (- j 2)) nil)
+	    (setq tok (append (if (> j 1) (elts tok 0 (- j 2)) nil)
 			      (if (and (numberp (elt tok (- j 1))) (numberp (elt tok (+ j 1))))
 				  (list (eval (list (cdr i) (elt tok (- j 1)) (elt tok (+ j 1)))))
-				(list (cdr i) (elt tok (- j 1)) (elt tok (+ j 1))))
-			      (if (< (+ j 2) (length tok)) (elts tok (+ 2 j) (- (length tok) 1)) nil) ))))
+				(list (list (cdr i) (elt tok (- j 1)) (elt tok (+ j 1)))))
+			      (if (< (+ j 2) (length tok)) (elts tok (+ 2 j) (- (length tok) 1)) nil)))
+	    (setq j (- j 2))
+	    ))
 	(inc j) )))
     (if (= 1 (length tok)) (car tok) tok) 
     ))

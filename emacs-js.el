@@ -58,8 +58,7 @@
 (defvar emacs-js-null (cons '( "null" ) (lambda(l) '(nil))))
 (defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt l 0)) (string-equal (elt l 0) "true")) '( t ) '( nil )))))
 (defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(list (substring (elt l 0) 1 -1)))))
-(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (elt l 1)))) 
-
+(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (list (elt l 1)))))
 ;; array
 (defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(tk) (cdr tk))))
 (defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) l)))
@@ -77,7 +76,6 @@
 (defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:]*")
 (defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) l)))
 (defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (tk) (list (list 'emacs-js-getvarf (list 'sxhash (elt tk 0)))))))  ;; double list commands
-
 
 (defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr )
                               (lambda (l) (emacs-js-defvarf (sxhash (elt l 1)) (elt l 1) (elt l 3)))))
@@ -258,7 +256,7 @@ HASH is (sxhash  SYMBOL)
 
 
 
-(defmacro fpdiv (a b) (list '/ (list '* 1.0 a) b))
+(defun fpdiv (a b) (/ (* 1.0 a) b))
 
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
   (let ((tok tokens)
@@ -277,8 +275,9 @@ HASH is (sxhash  SYMBOL)
 			      (if (< (+ j 2) (length tok)) (elts tok (+ 2 j) (- (length tok) 1)) nil)))
 	    (setq j (- j 2))
 	    ))
-	(inc j) )))
-    (if (= 1 (length tok)) (car tok) tok) 
+	  (inc j)
+	  )))
+    (if (numberp (elt tok 0)) (elt tok 0) tok)
     ))
 
 

@@ -39,7 +39,6 @@
 				 emacs-js-numeric
 				 emacs-js-string
 				 emacs-js-array
-
 				 emacs-js-obj
 				 emacs-js-symbol
 				 ;;  emacs-js-prototype
@@ -74,7 +73,7 @@
                            
 (defvar emacs-js-numeric (cons '( "[+-]?[0-9]+\\(\\.[0-9]+\\)?" )
                                (lambda (l) (string-to-number (elt l 0)))))
-(defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:]*")
+(defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:\\*\\/\\+\\-\\|\\&]*")
 (defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) l)))
 (defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (tk) (list (list 'emacs-js-getvarf (list 'sxhash (elt tk 0)))))))  ;; double list commands
 
@@ -83,12 +82,13 @@
 
 (defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
 
-(defvar emacs-js-statement (cons '( (
-                                      emacs-js-defvar
-				      emacs-js-expr
-				      emacs-js-function
-                                      ) ";" )
-                                  (lambda (l) l )))
+(defvar emacs-js-statement  emacs-js-statement (cons (list (list
+                                      'emacs-js-defvar
+				      'emacs-js-expr
+				      'emacs-js-function
+                                      ) ";")
+                                  (lambda (l) (elt l 0) )))
+
 
 	;;  ____  _        _        __     __         _       _     _           	
 	;; / ___|| |_ __ _| |_ ___  \ \   / /_ _ _ __(_) __ _| |__ | | ___  ___ 	
@@ -133,7 +133,10 @@
             (if (and lm (= 0 lm))
                 (let ((token (match-string 0 s)))
                   (setq tokens (append tokens (if (listp token) token (list token))))
-                  (setq s (substring s (length token)))
+
+		  (print (concat "Found " token " in " s))
+                  (setq s (substring s (length token) ))
+		  (print s)
 		  (setq strlens (cons (length s) strlens))
 		  )
 	      (setq lm nil)
@@ -161,7 +164,9 @@
                         (progn
                           (let ((token (match-string 0 s)))
 			    (setq tokens (append tokens (if (listp token) token (list token))))
-                            (setq s (substring s (length token)))
+			    (print (concat "Found " token " in " s))
+			    (setq s (substring s (length token) ))
+			    (print s)
 			    (setq strlens (cons (length s) strlens))
                             )) )
 		    )) (inc k) )

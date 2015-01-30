@@ -35,19 +35,20 @@
 (defvar emacs-js-single (cons  '( (
 				 emacs-js-null
 				 emacs-js-boolean
+				 emacs-js-parens
 				 emacs-js-numeric
 				 emacs-js-string
 				 emacs-js-array
-				 emacs-js-parens
+
 				 emacs-js-obj
 				 emacs-js-symbol
 				 ;;  emacs-js-prototype
                                  ;;  emacs-js-function
                                  ))
 			       (lambda (l) l)))
-(defvar emacs-js-expr (cons '( (emacs-js-operator emacs-js-single )) (lambda (l) l)))
+(defvar emacs-js-expr (cons (list (list 'emacs-js-operator 'emacs-js-single )) (lambda (l) l)))
 (defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) l)))
-(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "\/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
+(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
 (defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
 
 (defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(l) (cdr l)))) ;; cdr to skip comma
@@ -125,7 +126,7 @@
 
       (setq s (replace-regexp-in-string "^[\s\t]*" "" s ))                                 ;; kill starting whitspace
       (setq s (replace-regexp-in-string "^\/\/.*?\n" "" s ))  ; kill comments
-      (setq s (replace-regexp-in-string "^\/\*.*?\*\/" "" s )) ; kill comments
+      (setq s (replace-regexp-in-string "^/\\*[^\\*/]*\\*/" "" s )) ; kill comments
       (if (stringp (elt test-patterns i))
           (progn
             (setq lm  (string-match (elt test-patterns i) s))
@@ -146,7 +147,9 @@
                     (let* ((symbol-test (emacs-js-test s (symbol-value (elt orlist k))))
 			   (token (car symbol-test)) )
                       (if symbol-test
+
 			  (progn
+;;			    (print (symbol-name (elt orlist k)))
 			    (setq tokens (append tokens (if (listp token) token (list token))))
                             (setq s (cdr symbol-test))
 			    (setq strlens (cons (length s) strlens))
@@ -169,7 +172,9 @@
               (let* ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i))))
 		     (token (car symbol-test)) )
                 (if symbol-test
+
                     (progn
+;;		      (print (symbol-name (elt test-patterns i)))
 		      (setq tokens (append tokens (if (listp token) token (list token))))
 		      (setq s (cdr symbol-test))
 		      (setq strlens (cons (length s) strlens))
@@ -260,7 +265,7 @@ HASH is (sxhash  SYMBOL)
 
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
   (let ((tok tokens)
-	(op-order (list (cons "*" '*) (cons "/" 'fpdiv) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
+	(op-order (list (cons "*" '*) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
 			(cons "||" 'or) (cons "&&" 'and) )) )
     ;; 3 "+" 2 "*" 3 "-" 2 "+" 2
     (dolist (i op-order)

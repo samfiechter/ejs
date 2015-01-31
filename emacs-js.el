@@ -50,7 +50,7 @@
 (defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
 (defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
 
-(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(l) (cdr l)))) ;; cdr to skip comma
+(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(lama) (cdr l)))) ;; cdr to skip comma
 (defvar emacs-js-fn-arg-first (cons (list 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda (l) l)))
 (defvar emacs-js-fn-stmt-more (cons '( emacs-js-statement ( emacs-js-fn-stmt-more "}")) (lambda (l) l)))
 (defvar emacs-js-defun (cons (list "function" "(" (list 'emacs-js-fn-arg-first ")" ) "{" (list "}" 'emacs-js-fn-stmt-more )) ( lambda (l) (emacs-js-defunf l))))
@@ -73,7 +73,7 @@
                            
 (defvar emacs-js-numeric (cons '( "[+-]?[0-9]+\\(\\.[0-9]+\\)?" )
                                (lambda (l) (string-to-number (elt l 0)))))
-(defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:\\*\\/\\+\\-\\|\\&]*")
+
 (defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) l)))
 (defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (tk) (list (list 'emacs-js-getvarf (list 'sxhash (elt tk 0)))))))  ;; double list commands
 
@@ -82,7 +82,7 @@
 
 (defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
 
-(defvar emacs-js-statement  emacs-js-statement (cons (list (list
+(defvar emacs-js-statement (cons (list (list
                                       'emacs-js-defvar
 				      'emacs-js-expr
 				      'emacs-js-function
@@ -133,10 +133,7 @@
             (if (and lm (= 0 lm))
                 (let ((token (match-string 0 s)))
                   (setq tokens (append tokens (if (listp token) token (list token))))
-
-		  (print (concat "Found " token " in " s))
                   (setq s (substring s (length token) ))
-		  (print s)
 		  (setq strlens (cons (length s) strlens))
 		  )
 	      (setq lm nil)
@@ -150,7 +147,6 @@
                     (let* ((symbol-test (emacs-js-test s (symbol-value (elt orlist k))))
 			   (token (car symbol-test)) )
                       (if symbol-test
-
 			  (progn
 ;;			    (print (symbol-name (elt orlist k)))
 			    (setq tokens (append tokens (if (listp token) token (list token))))
@@ -164,9 +160,9 @@
                         (progn
                           (let ((token (match-string 0 s)))
 			    (setq tokens (append tokens (if (listp token) token (list token))))
-			    (print (concat "Found " token " in " s))
+
 			    (setq s (substring s (length token) ))
-			    (print s)
+
 			    (setq strlens (cons (length s) strlens))
                             )) )
 		    )) (inc k) )
@@ -177,7 +173,6 @@
               (let* ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i))))
 		     (token (car symbol-test)) )
                 (if symbol-test
-
                     (progn
 ;;		      (print (symbol-name (elt test-patterns i)))
 		      (setq tokens (append tokens (if (listp token) token (list token))))
@@ -202,19 +197,6 @@
          )
        )
 
-(defun elts (mylst start end)
-  (mapcar (lambda (x) (elt mylst x)) (number-sequence start end)) )
-
-(defmacro inc (var)
-  (list 'setq var (list '+ 1 var)) )
-
-
-
-(defmacro skip-chars-listed (idx txt len skipchars)
-  (list 'while (list 'and (list '< idx len) (list 'char-in-sstr (list 'elt txt idx) skipchars)) (list 'inc idx)) )
-
-(defmacro skip-chars-not-listed (idx txt len skipchars)
-  (list 'while (list 'and (list '< idx len) (list 'not (list 'char-in-sstr (list 'elt txt idx) skipchars))) (list 'inc idx)) )
 
 (defun emacs-js-defunf (toks) ;; function is defined as 
   (let ((i 1)
@@ -266,10 +248,11 @@ HASH is (sxhash  SYMBOL)
 
 
 
-(defun fpdiv (a b) (/ (* 1.0 a) b))
+
 
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
-  (let ((tok tokens)
+
+       (let ((tok tokens)
 	(op-order (list (cons "*" '*) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
 			(cons "||" 'or) (cons "&&" 'and) )) )
     ;; 3 "+" 2 "*" 3 "-" 2 "+" 2
@@ -287,33 +270,42 @@ HASH is (sxhash  SYMBOL)
 	    ))
 	  (inc j)
 	  )))
+;;    (dolist (tk tok) (print (if (numberp tk) (number-to-string tk) tk))) 
     (if (numberp (elt tok 0)) (elt tok 0) tok)
     ))
 
+(defun emacs-js-primatives () "Create prototypes for js primatives undefined, null, boolean, string, number, object"
+       (let* ((tx "numeric")
+	     (n (make-hash-table))
+	     (props (list (cons "*" '*) (cons "^" 'expt) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
+			  (cons "||" 'or) (cons "&&" 'and) (cons "type" tx)
+			  (cons "toString" (list 'number-to-string (list 'emacs-js-getvarf (list 'sxhash "this"))))						      
+			  )))
+	 (dolist (o props)
+	   (puthash (sxhash (car o)) o n) )
+	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)
+	 )
+       
+   
 
-(defun char-in-sstr (c s)
-  (let ((i 0)
-        (l (length s)))
-    (while (and (< i l) (< (elt s i) c))
-      (setq i (+ 1 i)) )
-    (char-equal (elt s i) c)))
+	;;  _   _      _                 	
+	;; | | | | ___| |_ __   ___ _ __ 	
+	;; | |_| |/ _ \ | '_ \ / _ \ '__|	
+	;; |  _  |  __/ | |_) |  __/ |   	
+	;; |_| |_|\___|_| .__/ \___|_|   	
+	;;              |_|              	
+	;;  _____                 _   _                 	
+	;; |  ___|   _ _ __   ___| |_(_) ___  _ __  ___ 	
+	;; | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|	
+	;; |  _|| |_| | | | | (__| |_| | (_) | | | \__ \	
+	;; |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/	
+	                                             	
 
-(defun strsort (arr)
-  (let ((out "")
-        (i 0)
-        (l (length arr)))
-    (dotimes (i l)
-      (let ((x (elt arr i))
-            (j 0)
-            (ol (length out)))
-        (while (and (< j ol) (< (elt out j) x ))
-          (setq j (+ j 1)) )
+(defun elts (mylst start end)
+  (mapcar (lambda (x) (elt mylst x)) (number-sequence start end)) )
 
-        (setq out  (concat
-                    (substring out 0 j)
-                    (char-to-string x)
-                    (substring out j ol)
-                    ))
-        ))
-    out
-    ))
+(defmacro inc (var)
+  (list 'setq var (list '+ 1 var)) )
+
+
+(defun fpdiv (a b) (/ (* 1.0 a) b))

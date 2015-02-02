@@ -285,8 +285,22 @@ HASH is (sxhash  SYMBOL)
 	   (puthash (sxhash (car o)) o n) )
 	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)
 	 )
-       
-   
+
+       (let* ((tx "string")
+	      (n (make-hash-table))
+	      (props (list (cons "+" 'concat) 
+			   (cons "substring" 'emacs-js-string-substring)
+			   )))
+	 (dolist (o props)
+	   (puthash (sxhash (car o)) o n) )
+	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)
+	 )
+
+       )
+
+       (defun emacs-js-string-substring  (l)
+	 (substring (emacs-js-getvarf (sxhash this) (elt l 0) elt (l 1)))
+	 )
 
 	;;  _   _      _                 	
 	;; | | | | ___| |_ __   ___ _ __ 	

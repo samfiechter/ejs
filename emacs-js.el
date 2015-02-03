@@ -44,11 +44,11 @@
                                    ;;  emacs-js-prototype
                                    ;;  emacs-js-function
                                    ))
-                               (lambda (l) l)))
+                               (lambda (l) (car l))))
 (defvar emacs-js-expr (cons (list (list 'emacs-js-operator 'emacs-js-single )) (lambda (l) (car l)  )))
 (defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) (car l) )))
 (defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) (car l))))
-(defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
+(defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse (car l)))))
 
 (defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(lama) (cdr (car l))))) ;; cdr to skip comma
 (defvar emacs-js-fn-arg-first (cons (list 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda (l) (car l))))
@@ -73,7 +73,9 @@
 
 (defvar emacs-js-numeric (cons '( "[+-]?[0-9]+\\(\\.[0-9]+\\)?" )
                                (lambda (l) (string-to-number (elt (car l) 0)))))
-(defvar emacs-js-name-regex "TODO!!!")
+
+(defvar emacs-js-name-regex "[a-zA-Z\$_][^\s:\\*\\/\\+\\-\\|\\&]*")
+
 (defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) (car l))))
 (defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (l) (list (list 'emacs-js-getvarf (list 'sxhash (elt (car l) 0)))))))  ;; double list commands
 
@@ -159,10 +161,10 @@
               (while (and (< k (length orlist)) (if lm (not (= 0 lm)) 1))
                 (if (symbolp (elt orlist k))  ;; list can be symbol or string (two ors are one or)
                     (let* ((symbol-test (emacs-js-test s (symbol-value (elt orlist k)) (- txtl (length s))))
-                           (token (car symbol-test)) )
+                           (token  (car symbol-test))) 
                       (if symbol-test
                           (progn
-                            ;;                      (print (symbol-name (elt orlist k)))
+                        ;;                          (print (symbol-name (elt orlist k)))
                             (setq tokens (append tokens (if (listp token) token (list token))))
                             (setq s (cdr symbol-test))
                             (setq strlens (cons (length s) strlens))
@@ -183,7 +185,7 @@
           ;; If its not a list or a string its a symbol
           (if (symbolp (elt test-patterns i))
               (let* ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i))  (- txtl (length s))))
-                     (token (car symbol-test)) )
+                     (token (car symbol-test))) 
                 (if symbol-test
                     (progn
                       ;;                      (print (symbol-name (elt test-patterns i)))
@@ -263,7 +265,6 @@ HASH is (sxhash  SYMBOL)
 
 
 (defun emacs-js-operator-parse (tokens) "parses a list of tokens and spits out the value or code to calc..."
-
   (let ((tok tokens)
         (op-order (list (cons "*" '*) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
                         (cons "||" 'or) (cons "&&" 'and) )) )

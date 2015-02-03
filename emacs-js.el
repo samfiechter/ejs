@@ -45,51 +45,64 @@
                                  ;;  emacs-js-function
                                  ))
 			       (lambda (l) l)))
-(defvar emacs-js-expr (cons (list (list 'emacs-js-operator 'emacs-js-single )) (lambda (l) l)))
-(defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) l)))
-(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) l)))
+(defvar emacs-js-expr (cons (list (list 'emacs-js-operator 'emacs-js-single )) (lambda (l) (car l)  )))
+(defvar emacs-js-operator-more (cons '( ( emacs-js-operator-collect emacs-js-single)) (lambda (l) (car l) )))
+(defvar emacs-js-operator-collect (cons '( emacs-js-single ( "+" "-" "/" "*" "||" "&&" "|" "&" ) emacs-js-operator-more) (lambda (l) (car l))))
 (defvar emacs-js-operator (cons '( emacs-js-operator-collect) (lambda (l) (emacs-js-operator-parse l))))
 
-(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(lama) (cdr l)))) ;; cdr to skip comma
-(defvar emacs-js-fn-arg-first (cons (list 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda (l) l)))
-(defvar emacs-js-fn-stmt-more (cons '( emacs-js-statement ( emacs-js-fn-stmt-more "}")) (lambda (l) l)))
-(defvar emacs-js-defun (cons (list "function" "(" (list 'emacs-js-fn-arg-first ")" ) "{" (list "}" 'emacs-js-fn-stmt-more )) ( lambda (l) (emacs-js-defunf l))))
+(defvar emacs-js-fn-arg-more (cons (list "," 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda(lama) (cdr (car l))))) ;; cdr to skip comma
+(defvar emacs-js-fn-arg-first (cons (list 'emacs-js-name (list ")"  'emacs-js-fn-arg-more)) (lambda (l) (car l))))
+(defvar emacs-js-fn-stmt-more (cons '( emacs-js-statement ( emacs-js-fn-stmt-more "}")) (lambda (l) (car l))))
+(defvar emacs-js-defun (cons (list "function" "(" (list 'emacs-js-fn-arg-first ")" ) "{" (list "}" 'emacs-js-fn-stmt-more )) ( lambda (l) (emacs-js-defunf (car l)))))
 
 (defvar emacs-js-null (cons '( "null" ) (lambda(l) '(nil))))
-(defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt l 0)) (string-equal (elt l 0) "true")) '( t ) '( nil )))))
-(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(list (substring (elt l 0) 1 -1)))))
-(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (list (elt l 1)))))
+(defvar emacs-js-boolean (cons '( "\\(true\\|false\\)") (lambda (l) (if (and (stringp (elt (car l) 0)) (string-equal (elt (car l) 0) "true")) '( t ) '( nil )))))
+(defvar emacs-js-string (cons '( "\\(\"[^\"]*\"\\|\'[^\']*'\\)") (lambda (l)(list (substring (elt (car l) 0) 1 -1)))))
+(defvar emacs-js-parens (cons '( "(" emacs-js-expr ")" ) (lambda (l) (list (elt (car l) 1)))))
 ;; array
-(defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(tk) (cdr tk))))
-(defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) l)))
-(defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]")) (lambda (l) (emacs-js-make-array l))))
+(defvar emacs-js-array-more (cons (list "," 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda(l) (cdr (car l)))))
+(defvar emacs-js-array-first (cons (list 'emacs-js-expr (list "\\]"  'emacs-js-array-more)) (lambda (l) (car l))))
+(defvar emacs-js-array (cons (list "\\[" (list 'emacs-js-array-first  "\\]")) (lambda (l) (emacs-js-make-array (car l)))))
 
 ;; Object			     
-(defvar emacs-js-obj-more  (cons (list "," 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more))  (lambda (l) (cdr l)))) 
-(defvar emacs-js-obj-first  (cons (list 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more ) ) (lambda (l) l)))
-(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr) (lambda (l) (list (elt l 0) (elt l 2)))))
+(defvar emacs-js-obj-more  (cons (list "," 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more))  (lambda (l) (cdr (car l))))) 
+(defvar emacs-js-obj-first  (cons (list 'emacs-js-obj-expr (list "}" 'emacs-js-obj-more ) ) (lambda (l) (car l))))
+(defvar emacs-js-obj-expr (cons '( emacs-js-name ":" emacs-js-expr) (lambda (l) (list (elt (car l) 0) (elt (car l) 2)))))
 
-(defvar emacs-js-obj (cons (list "{" (list 'emacs-js-obj-first   "}" ) ) (lambda (l) (emacs-js-make-obj l))))
+(defvar emacs-js-obj (cons (list "{" (list 'emacs-js-obj-first   "}" ) ) (lambda (l) (emacs-js-make-obj (car l)))))
                            
 (defvar emacs-js-numeric (cons '( "[+-]?[0-9]+\\(\\.[0-9]+\\)?" )
-                               (lambda (l) (string-to-number (elt l 0)))))
-
-(defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) l)))
-(defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (tk) (list (list 'emacs-js-getvarf (list 'sxhash (elt tk 0)))))))  ;; double list commands
+                               (lambda (l) (string-to-number (elt (car l) 0)))))
+(defvar emacs-js-name-regex "TODO!!!")
+(defvar emacs-js-name (cons (list emacs-js-name-regex ) (lambda (l) (car l))))
+(defvar emacs-js-symbol (cons (list emacs-js-name-regex ) (lambda (l) (list (list 'emacs-js-getvarf (list 'sxhash (elt (car l) 0)))))))  ;; double list commands
 
 (defvar emacs-js-defvar (cons '( "var" emacs-js-name "=" emacs-js-expr )
-                              (lambda (l) (emacs-js-defvarf (sxhash (elt l 1)) (elt l 1) (elt l 3)))))
+                              (lambda (l) (emacs-js-defvarf (sxhash (elt (car l) 1)) (elt (car l) 1) (elt (car l) 3)))))
 
-(defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) )))
+(defvar emacs-js-statement-expr (cons '( emacs-js-expr ";") (lambda (l) (elt (car l) 0) )))
 
 (defvar emacs-js-statement (cons (list (list
                                       'emacs-js-defvar
 				      'emacs-js-expr
 				      'emacs-js-function
                                       ) ";")
-                                  (lambda (l) (elt l 0) )))
+                                  (lambda (l) (elt (car l) 0) )))
 
+	;;   ____                _              _       	
+	;;  / ___|___  _ __  ___| |_ __ _ _ __ | |_ ___ 	
+	;; | |   / _ \| '_ \/ __| __/ _` | '_ \| __/ __|	
+	;; | |__| (_) | | | \__ \ || (_| | | | | |_\__ \	
+	;;  \____\___/|_| |_|___/\__\__,_|_| |_|\__|___/	
+	                                             	
+(defvar emacs-js-STRING (sxhash "string"))
+(defvar emacs-js-NUMERIC (sxhash "numeric"))
+(defvar emacs-js-OBJECT (sxhash "object"))
+(defvar emacs-js-UNDEFINED (sxhash "undefined"))
+(defvar emacs-js-NULL (sxhash "null"))
 
+(defvar emacs-js-THIS (sxhash "this"))
+(defvar emacs-js-TOSTRING (sxhash "toString"))
 	;;  ____  _        _        __     __         _       _     _           	
 	;; / ___|| |_ __ _| |_ ___  \ \   / /_ _ _ __(_) __ _| |__ | | ___  ___ 	
 	;; \___ \| __/ _` | __/ _ \  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \/ __|	
@@ -108,7 +121,7 @@
 	;; |_|  \__,_|_| |_|\___|\__|_|\___/|_| |_|___/	
 	                                            	
 
-(defun emacs-js-test (jstext var)
+(defun emacs-js-test (jstext var start)
   (let* ((s jstext)                                     ;
          (test-patterns (car var))                      ;test pattern
          (testFunc (cdr var))                          ;function to translate tokens into bc
@@ -116,6 +129,7 @@
          (tokens (list))                                ;lists of tokens
          (lm 0)                                         ;lost match?
          (i 0)
+	 (txtl (+ start (length jstext)))
          )
     (while (and (< i (length test-patterns)) lm)
 
@@ -144,7 +158,7 @@
 	      (setq lm 1)
 	      (while (and (< k (length orlist)) (if lm (not (= 0 lm)) 1))
                 (if (symbolp (elt orlist k))  ;; list can be symbol or string (two ors are one or)
-                    (let* ((symbol-test (emacs-js-test s (symbol-value (elt orlist k))))
+                    (let* ((symbol-test (emacs-js-test s (symbol-value (elt orlist k)) (- txtl (length s))))
 			   (token (car symbol-test)) )
                       (if symbol-test
 			  (progn
@@ -160,9 +174,7 @@
                         (progn
                           (let ((token (match-string 0 s)))
 			    (setq tokens (append tokens (if (listp token) token (list token))))
-
 			    (setq s (substring s (length token) ))
-
 			    (setq strlens (cons (length s) strlens))
                             )) )
 		    )) (inc k) )
@@ -170,7 +182,7 @@
               ) 
           ;; If its not a list or a string its a symbol
           (if (symbolp (elt test-patterns i))
-              (let* ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i))))
+              (let* ((symbol-test (emacs-js-test s (symbol-value (elt test-patterns i))  (- txtl (length s))))
 		     (token (car symbol-test)) )
                 (if symbol-test
                     (progn
@@ -182,7 +194,7 @@
             (message "ERROR : DEF NOT SYMBOL, LIST, OR STRING"))))
       (inc i))
     (if lm
-	(cons (funcall testFunc tokens) s)
+	(cons (funcall testFunc (cons tokens (cons start (- txtl (length s))))) s)
       nil) ;; return the element and string
     ))
 
@@ -279,13 +291,14 @@ HASH is (sxhash  SYMBOL)
 	     (n (make-hash-table))
 	     (props (list (cons "*" '*) (cons "^" 'expt) (cons "/" '/) (cons "+" '+) (cons "-" '-) (cons "|" 'logior) (cons "&" 'logand)
 			  (cons "||" 'or) (cons "&&" 'and) (cons "type" tx)
-			  (cons "toString" (list 'number-to-string (list 'emacs-js-getvarf (list 'sxhash "this"))))						      
-			  )))
+			  (cons "toString" (list 'number-to-string (list 'emacs-js-getvarf emacs-js-THIS)))
+			  )
+		    )
+	     )
 	 (dolist (o props)
 	   (puthash (sxhash (car o)) o n) )
-	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)
+	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)	 
 	 )
-
        (let* ((tx "string")
 	      (n (make-hash-table))
 	      (props (list (cons "+" 'concat) 
@@ -295,8 +308,9 @@ HASH is (sxhash  SYMBOL)
 	   (puthash (sxhash (car o)) o n) )
 	 (puthash (sxhash tx) (cons tx n) emacs-js-prototypes)
 	 )
-
        )
+
+       
 
        (defun emacs-js-string-substring  (l)
 	 (substring (emacs-js-getvarf (sxhash this) (elt l 0) elt (l 1)))
